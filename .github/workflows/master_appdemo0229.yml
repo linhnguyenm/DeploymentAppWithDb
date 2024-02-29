@@ -21,7 +21,8 @@ jobs:
         with:
           dotnet-version: '6.0.x'
           include-prerelease: true
-
+      - name: Restore dependencies
+        run: dotnet restore
       - name: Build with dotnet
         run: dotnet build --configuration Release
 
@@ -33,6 +34,19 @@ jobs:
         with:
           name: .net-app
           path: ${{env.DOTNET_ROOT}}/myapp
+      - name: Install EntityFrameworkCore Tools
+        run:
+            dotnet new tool-manifest
+            dotnet tool install dotnet-ef
+      - name: Generate EF Core Migration Script
+        run: dotnet ef migrations script --idempotent --no-build --configuration Release --output ${{env.DOTNET_ROOT}}/sql/sql-script.sql --context DeploymentAppWithDb.Data.ProjectContext --project ${{ github.workspace }}/DeploymentAppWithDb/DeploymentAppWithDb.csproj
+
+      - uses: actions/upload-artifact@v3  
+        with: 
+          name: ddl-updates
+          path: ${{env.DOTNET_ROOT}}/sql/sql-script.sql 
+
+            
 
   deploy:
     runs-on: windows-latest
@@ -46,9 +60,7 @@ jobs:
     steps:
       - name: Download artifact from build job
         uses: actions/download-artifact@v3
-        with:
-          name: .net-app
-      
+       
       - name: Login to Azure
         uses: azure/login@v1
         with:
@@ -62,5 +74,13 @@ jobs:
         with:
           app-name: 'appdemo0229'
           slot-name: 'Production'
-          package: .
+          package: ./.net-app/
+          
+       - name: Azure SQL
+         uses: Azure/sql-action@v2
+         with:
+           #The connection string, including authentcation information, for the Azure SQL Server database
+           connection-string: ${{ secrets.SQL_CONNECTION_STRING }}
+           #Path to the file used for this action. Supported file types are .sql, .dacpac, or .sqlproj.
+           path: ./ddl-updates/sql-script.sql
           
