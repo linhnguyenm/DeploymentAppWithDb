@@ -20,9 +20,10 @@ jobs:
         uses: actions/setup-dotnet@v1
         with:
           dotnet-version: '7.0.x'
-          include-prerelease: true
+        
       - name: Restore dependencies
         run: dotnet restore
+        
       - name: Build with dotnet
         run: dotnet build --configuration Release
 
@@ -30,12 +31,16 @@ jobs:
         run: dotnet publish -c Release -o ${{env.DOTNET_ROOT}}/myapp
 
       - name: Upload artifact for deployment job
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v2
         with:
           name: .net-app
           path: ${{env.DOTNET_ROOT}}/myapp
-          
       
+      - name: Install EntityFrameworkCore Tools
+        run:
+            dotnet new tool-manifest --ignore-if-exists
+            dotnet tool install dotnet-ef --ignore-if-installed
+            
       - name: Generate EF Core Migration Script
         run: dotnet ef migrations script --idempotent --no-build --configuration Release --output ${{env.DOTNET_ROOT}}/sql/sql-script.sql --context DeploymentAppWithDb.Data.ProjectContext --project ${{ github.workspace }}/DeploymentAppWithDb/DeploymentAppWithDb.csproj
 
